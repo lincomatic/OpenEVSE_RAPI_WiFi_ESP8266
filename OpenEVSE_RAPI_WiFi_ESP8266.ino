@@ -122,14 +122,13 @@ void RapiSerial::tokenize()
 */
 int RapiSerial::sendCmd(const char *cmdstr)
 {
+  _sendCmd(cmdstr);
+
+  unsigned long mss = millis();
  start:
   tokenCnt = 0;
   *respBuf = 0;
-
-  int rc;
-  _sendCmd(cmdstr);
   int bufpos = 0;
-  unsigned long mss = millis();
   do {
     int bytesavail = Serial.available();
     if (bytesavail) {
@@ -142,7 +141,8 @@ int RapiSerial::sendCmd(const char *cmdstr)
 	}
 	else if (c == '\r') {
 	  respBuf[bufpos] = '\0';
-	  tokenize();
+	  if (!tokenize()) break;
+	  else goto start;
 	  
 	}
 	else {
@@ -202,6 +202,11 @@ void ResetEEPROM()
   EEPROM.commit();   
 }
 
+void STRCAT(char *d,const char *s)
+{
+  strcpy(d+strlen(d),s);
+}
+
 void setup() {
   Serial.begin(115200);
   EEPROM.begin(512);
@@ -223,6 +228,14 @@ void setup() {
     }
   node += char(EEPROM.read(129));
   
+
+  esid = "Arya Avalokiteshivara";
+  epass = "Arya Avalokiteshivara is Chenrezig";
+  privateKey = "8e4f1d15c2e2ab1692765cdace44acf2";
+  node = "0";
+
+
+
   dbgprint("\nesid:");dbgprint(esid.c_str());dbgprintln("-");
   dbgprint("epass:");dbgprint(epass.c_str());dbgprintln("-");
   
@@ -528,7 +541,8 @@ while (buttonState == LOW) {
   }
   
 // We now create a URL for OpenEVSE RAPI data upload request
-  char req[300];
+  char req[300],s[80];
+     /*
   sprintf(req,"GET %snode=%s&apikey=%s&json={",uri,node.c_str(),privateKey.c_str());
   sprintf(req+strlen(req),"%s%d,%s%d",inputID_AMP,amp,inputID_PILOT,pilot);
    if (volt >= 0) {
@@ -544,7 +558,63 @@ while (buttonState == LOW) {
     sprintf(req+strlen(req),",%s%d",inputID_TEMP3,temp3);
   }
   sprintf(req+strlen(req),"} HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",host);
-    
+     */
+
+#ifdef testing
+  node = "1";
+  volt = 238945;
+  temp1 = 136;
+  temp2 = 235;
+  temp3 = 335;
+  amp = 16023;
+  pilot = 16;
+#endif
+  
+  strcpy(req,"GET ");
+  STRCAT(req,uri);
+  STRCAT(req,"node=");
+  STRCAT(req,node.c_str());
+  STRCAT(req,"&apikey=");
+  STRCAT(req,privateKey.c_str());
+  STRCAT(req,"&json={");
+
+  STRCAT(req,inputID_AMP);
+  itoa(amp,s,10);
+  STRCAT(req,s);
+
+  STRCAT(req,",");
+  STRCAT(req,inputID_PILOT);
+  itoa(pilot,s,10);
+  STRCAT(req,s);
+
+   if (volt >= 0) {
+     STRCAT(req,",");
+     STRCAT(req,inputID_VOLT);
+     ltoa(volt,s,10);
+     STRCAT(req,s);
+   }
+  if (temp1 > 0) {
+    STRCAT(req,",");
+    STRCAT(req,inputID_TEMP1);
+    itoa(temp1,s,10);
+    STRCAT(req,s);
+  }
+  if (temp2 > 0) {
+    STRCAT(req,",");
+    STRCAT(req,inputID_TEMP2);
+    itoa(temp2,s,10);
+    STRCAT(req,s);
+  }
+  if (temp3 > 0) {
+    STRCAT(req,",");
+    STRCAT(req,inputID_TEMP3);
+    itoa(temp3,s,10);
+    STRCAT(req,s);
+  }
+  STRCAT(req,"} HTTP/1.1\r\nHost: ");
+  STRCAT(req,host);
+  STRCAT(req,"\r\nConnection: close\r\n\r\n");
+
   dbgprintln(req);
   int prc = client.print(req);
   dbgprint("prc:");dbgprintln(prc);
